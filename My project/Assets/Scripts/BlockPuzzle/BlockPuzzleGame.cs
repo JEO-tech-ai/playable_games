@@ -21,13 +21,35 @@ namespace ColorDrive
 
         private Color[] COLORS = new Color[]
         {
-            new Color(0.18f, 0.52f, 1.00f),   // Vivid Blue
-            new Color(1.00f, 0.28f, 0.30f),   // Vivid Red
-            new Color(0.15f, 0.90f, 0.40f),   // Vivid Green
-            new Color(1.00f, 0.88f, 0.10f),   // Vivid Yellow
-            new Color(1.00f, 0.52f, 0.08f),   // Vivid Orange
-            new Color(0.80f, 0.25f, 1.00f),   // Vivid Purple
-            new Color(0.10f, 0.95f, 0.95f),   // Cyan
+            new Color(0.91f, 0.00f, 0.18f),  // Candy Red    #E8002D
+            new Color(1.00f, 0.47f, 0.00f),  // Vivid Orange #FF7800
+            new Color(0.96f, 0.76f, 0.00f),  // Vivid Yellow #F5C200
+            new Color(0.00f, 0.77f, 0.31f),  // Vivid Green  #00C44F
+            new Color(0.10f, 0.50f, 1.00f),  // Royal Blue   #1A7FFF
+            new Color(0.61f, 0.15f, 0.69f),  // Vivid Purple #9B27AF
+            new Color(0.00f, 0.85f, 0.90f),  // Teal Cyan    #00D9E6
+        };
+
+        private Color[] HIGHLIGHT_COLORS = new Color[]
+        {
+            new Color(1.00f, 0.48f, 0.54f),  // Red highlight
+            new Color(1.00f, 0.75f, 0.48f),  // Orange highlight
+            new Color(1.00f, 0.89f, 0.48f),  // Yellow highlight
+            new Color(0.48f, 1.00f, 0.70f),  // Green highlight
+            new Color(0.48f, 0.75f, 1.00f),  // Blue highlight
+            new Color(0.82f, 0.48f, 0.91f),  // Purple highlight
+            new Color(0.48f, 1.00f, 1.00f),  // Cyan highlight
+        };
+
+        private Color[] SHADOW_COLORS = new Color[]
+        {
+            new Color(0.55f, 0.00f, 0.10f),  // Red shadow
+            new Color(0.60f, 0.28f, 0.00f),  // Orange shadow
+            new Color(0.58f, 0.46f, 0.00f),  // Yellow shadow
+            new Color(0.00f, 0.46f, 0.19f),  // Green shadow
+            new Color(0.06f, 0.25f, 0.67f),  // Blue shadow
+            new Color(0.36f, 0.09f, 0.41f),  // Purple shadow
+            new Color(0.00f, 0.50f, 0.55f),  // Cyan shadow
         };
 
         // ── Game State ────────────────────────────────────────────────────────
@@ -53,6 +75,7 @@ namespace ColorDrive
         private GameObject[] _queueVis = new GameObject[3];
         private TextMesh _scoreText, _movesText, _statusText;
         private Sprite _roundedSprite;
+        private Sprite[] _pieceSprites;  // per-color 3D gem sprites
 
         // ── Slot pulse state ──────────────────────────────────────────────────
         private List<SpriteRenderer> _slotRenderers = new List<SpriteRenderer>();
@@ -78,6 +101,9 @@ namespace ColorDrive
         void Start()
         {
             _roundedSprite = MakeRoundedSprite();
+            _pieceSprites = new Sprite[COLORS.Length];
+            for (int i = 0; i < COLORS.Length; i++)
+                _pieceSprites[i] = MakePieceSprite(COLORS[i], HIGHLIGHT_COLORS[i], SHADOW_COLORS[i]);
             SetupCamera();
             SetupBackground();
             InitGrid();
@@ -119,13 +145,13 @@ namespace ColorDrive
             cam.orthographic = true;
             cam.orthographicSize = 5.8f;
             cam.transform.position = new Vector3(0, 0, -10);
-            cam.backgroundColor = new Color(0.07f, 0.07f, 0.12f);
+            cam.backgroundColor = new Color(0.10f, 0.04f, 0.18f);
         }
 
         void SetupBackground()
         {
             MakeQuad("Background", Vector3.forward * 2f, new Vector2(25f, 18f),
-                new Color(0.07f, 0.07f, 0.12f), -10);
+                new Color(0.10f, 0.04f, 0.18f), -10);
         }
 
         void InitGrid()
@@ -144,21 +170,24 @@ namespace ColorDrive
             float ox = GridOriginX();
             float oy = GridOriginY();
 
-            // Grid panel background
+            // Grid panel background — royal purple
             float gw = gridCols * cellSize;
             float gh = gridRows * cellSize;
-            MakeQuad("GridPanel", new Vector3(0, 0, 0.5f), new Vector2(gw + 0.3f, gh + 0.3f),
-                new Color(0.13f, 0.13f, 0.2f), -2);
+            MakeQuad("GridPanel", new Vector3(0, 0, 0.5f), new Vector2(gw + 0.4f, gh + 0.4f),
+                new Color(0.165f, 0.122f, 0.306f), -2);
+            // Grid panel inner shadow (slightly darker, slightly smaller)
+            MakeQuad("GridPanelInner", new Vector3(0, 0, 0.4f), new Vector2(gw + 0.1f, gh + 0.1f),
+                new Color(0.118f, 0.086f, 0.251f), -1);
 
             for (int x = 0; x < gridCols; x++)
                 for (int y = 0; y < gridRows; y++)
                 {
                     float px = ox + x * cellSize;
                     float py = oy + y * cellSize;
-                    bool dark = (x + y) % 2 == 0;
-                    Color c = dark ? new Color(0.18f, 0.18f, 0.26f) : new Color(0.2f, 0.2f, 0.28f);
+                    // Inset cell slot — dark purple base
+                    Color c = new Color(0.118f, 0.086f, 0.251f);
                     var cell = MakeQuad($"C{x},{y}", new Vector3(px, py, 0.2f),
-                        Vector2.one * (cellSize - 0.04f), c, -1);
+                        Vector2.one * (cellSize - 0.06f), c, -1);
                     _cellVis[x, y] = cell;
                 }
         }
@@ -250,7 +279,7 @@ namespace ColorDrive
                 float px = (i - 1) * 2.2f;
                 var slot = MakeQuad($"QSlot{i}",
                     qRoot.transform.position + new Vector3(px, 0, -0.2f),
-                    Vector2.one * 1.8f, new Color(0.15f, 0.15f, 0.25f, 0.8f), 0);
+                    Vector2.one * 1.8f, new Color(0.165f, 0.122f, 0.306f, 0.9f), 0);
                 slot.transform.SetParent(qRoot.transform);
                 slot.AddComponent<BoxCollider2D>().size = Vector2.one * 1.8f;
 
@@ -269,7 +298,7 @@ namespace ColorDrive
 
             // Title
             var titleGO = MakeTextMesh("Title", new Vector3(0, hh + 1.6f, 0),
-                "COLOR DRIVE", 0.09f, new Color(1f, 0.85f, 0.2f));
+                "COLOR DRIVE", 0.09f, new Color(1f, 0.9f, 0.4f));
 
             // Score
             var scoreGO = MakeTextMesh("Score", new Vector3(-hw - 0.2f, hh + 1.6f, 0),
@@ -278,13 +307,13 @@ namespace ColorDrive
 
             // Moves
             var movesGO = MakeTextMesh("Moves", new Vector3(hw + 0.2f, hh + 1.6f, 0),
-                $"MOVES\n{movesAllowed}", 0.075f, new Color(1f, 0.6f, 0.2f));
+                $"MOVES\n{movesAllowed}", 0.075f, new Color(1f, 0.9f, 0.4f));
             _movesText = movesGO.GetComponent<TextMesh>();
 
             // Status/instruction
             var statusGO = MakeTextMesh("Status",
                 new Vector3(0, -(hh + gridRows * cellSize / 2f + 3.9f), 0),
-                "", 0.048f, new Color(0.5f, 0.8f, 1f));
+                "", 0.048f, new Color(0.7f, 0.85f, 1f));
             _statusText = statusGO.GetComponent<TextMesh>();
 
             // R key hint
@@ -517,7 +546,7 @@ namespace ColorDrive
             Color clearColor = sr.color;
             sr.color = Color.white;
             yield return new WaitForSeconds(0.1f);
-            sr.color = new Color(0.18f, 0.18f, 0.26f);  // empty color
+            sr.color = new Color(0.118f, 0.086f, 0.251f);  // empty color (deep purple)
         }
 
         private bool IsBoardClear()
@@ -591,7 +620,19 @@ namespace ColorDrive
         {
             if (_cellVis[x, y] == null) return;
             var sr = _cellVis[x, y].GetComponent<SpriteRenderer>();
-            if (sr != null) sr.color = color;
+            if (sr == null) return;
+            // Find color index
+            int colorIdx = _grid[x, y];
+            if (colorIdx >= 0 && _pieceSprites != null && colorIdx < _pieceSprites.Length)
+            {
+                sr.sprite = _pieceSprites[colorIdx];
+                sr.color = Color.white;
+            }
+            else
+            {
+                sr.sprite = _roundedSprite;
+                sr.color = color;
+            }
         }
 
         void UpdateQueueVisuals()
@@ -602,7 +643,7 @@ namespace ColorDrive
 
                 // Clear previous piece visuals
                 var sr = _queueVis[i].GetComponent<SpriteRenderer>();
-                if (sr != null) sr.color = new Color(0.15f, 0.15f, 0.25f, 0.8f);
+                if (sr != null) sr.color = new Color(0.165f, 0.122f, 0.306f, 0.9f);
 
                 // Destroy old cell children
                 for (int c = _queueVis[i].transform.childCount - 1; c >= 0; c--)
@@ -623,6 +664,8 @@ namespace ColorDrive
                         Vector2.one * 0.34f, pColor, 3);
                     cellGO.name = $"PC_{cell.x}_{cell.y}";
                     cellGO.transform.SetParent(_queueVis[i].transform);
+                    var cellSR = cellGO.GetComponent<SpriteRenderer>();
+                    if (cellSR != null) { cellSR.color = Color.white; cellSR.sprite = _pieceSprites[piece.colorIdx]; }
                 }
             }
         }
@@ -636,7 +679,7 @@ namespace ColorDrive
                 if (sr != null)
                     sr.color = i == selected
                         ? new Color(1f, 0.9f, 0.2f, 0.5f)
-                        : new Color(0.15f, 0.15f, 0.25f, 0.8f);
+                        : new Color(0.165f, 0.122f, 0.306f, 0.9f);
             }
         }
 
@@ -680,8 +723,7 @@ namespace ColorDrive
                 for (int y = 0; y < gridRows; y++)
                 {
                     _grid[x, y] = -1;
-                    bool dark = (x + y) % 2 == 0;
-                    Color c = dark ? new Color(0.18f, 0.18f, 0.26f) : new Color(0.2f, 0.2f, 0.28f);
+                    Color c = new Color(0.118f, 0.086f, 0.251f);
                     UpdateCellVisual(x, y, c);
                 }
 
@@ -748,6 +790,68 @@ namespace ColorDrive
             tex.Apply();
             return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
+
+        Sprite MakePieceSprite(Color baseColor, Color highlightColor, Color shadowColor, int size = 64)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            var pixels = new Color32[size * size];
+
+            Vector2 center = new Vector2(size * 0.5f - 0.5f, size * 0.5f - 0.5f);
+            float outerR  = size * 0.44f;
+            float innerR  = size * 0.40f;  // rim darkening starts here
+            float glowR   = size * 0.20f;
+
+            // Specular highlight ellipse (upper-left)
+            Vector2 hlCenter = center + new Vector2(-size * 0.14f, size * 0.14f);
+            float hlRx = size * 0.18f;
+            float hlRy = size * 0.13f;
+
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                Vector2 pos    = new Vector2(x, y);
+                Vector2 fromC  = pos - center;
+                float dist     = fromC.magnitude;
+
+                if (dist > outerR) { pixels[y * size + x] = new Color32(0,0,0,0); continue; }
+
+                // 1. Base fill
+                Color col = baseColor;
+
+                // 2. Directional shadow (bottom-right darkening)
+                Vector2 lightDir = new Vector2(0.55f, -0.55f).normalized;
+                float shadowDot  = Vector2.Dot(fromC.magnitude > 0f ? fromC.normalized : Vector2.zero, -lightDir);
+                col = Color.Lerp(col, shadowColor, Mathf.Clamp01(shadowDot) * 0.55f);
+
+                // 3. Inner glow (center brightness lift)
+                float glowT = Mathf.Clamp01(1f - dist / glowR);
+                col = Color.Lerp(col, highlightColor, glowT * glowT * 0.40f);
+
+                // 4. Rim darkening
+                if (dist >= innerR)
+                {
+                    float rimT = (dist - innerR) / (outerR - innerR);
+                    col = Color.Lerp(col, Color.black, rimT * 0.55f);
+                }
+
+                // 5. Specular highlight (upper-left ellipse)
+                Vector2 fromHl = pos - hlCenter;
+                float hlEllipse = (fromHl.x * fromHl.x) / (hlRx * hlRx)
+                                + (fromHl.y * fromHl.y) / (hlRy * hlRy);
+                if (hlEllipse <= 1f)
+                {
+                    float alpha = Mathf.Clamp01(1f - hlEllipse) * 0.72f;
+                    col = Color.Lerp(col, Color.white, alpha);
+                }
+
+                pixels[y * size + x] = col;
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), (float)size);
+        }
     }
 
     // ── Trigger helpers (nested so they don't conflict with main game) ─────────
@@ -796,7 +900,7 @@ namespace ColorDrive
         void OnMouseExit()
         {
             var sr = GetComponent<SpriteRenderer>();
-            if (sr != null) sr.color = new Color(0.15f, 0.15f, 0.25f, 0.8f);
+            if (sr != null) sr.color = new Color(0.165f, 0.122f, 0.306f, 0.9f);
         }
     }
 }
