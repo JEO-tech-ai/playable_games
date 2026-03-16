@@ -602,6 +602,15 @@ namespace ColorDrive
             var sr = _cellVis[x, y].GetComponent<SpriteRenderer>();
             if (sr == null) yield break;
 
+            // Get spark color from glow child (sr.color is white for gems)
+            Color sparkColor = new Color(1f, 0.85f, 0.2f);
+            var glowChild = _cellVis[x, y].transform.Find("_Glow");
+            if (glowChild != null)
+            {
+                var glowSR = glowChild.GetComponent<SpriteRenderer>();
+                if (glowSR != null) { sparkColor = glowSR.color; sparkColor.a = 1f; }
+            }
+
             // Spawn 6 sparkle particles
             Vector3 origin = _cellVis[x, y].transform.position;
             for (int p = 0; p < 6; p++)
@@ -612,8 +621,7 @@ namespace ColorDrive
                 var sparkSR = spark.AddComponent<SpriteRenderer>();
                 sparkSR.sprite = _roundedSprite;
                 sparkSR.sortingOrder = 50;
-                Color sc = sr.color; sc.a = 1f;
-                sparkSR.color = sc;
+                sparkSR.color = sparkColor;
                 spark.transform.localScale = Vector3.one * 0.15f;
                 StartCoroutine(SparkCoroutine(spark, angle));
             }
@@ -729,10 +737,10 @@ namespace ColorDrive
                 sr.sprite = _pieceSprites[colorIdx];
                 sr.color = Color.white;
 
-                // Add glow overlay
+                // Add glow overlay (behind gem, positive Z = away from camera)
                 var glowGO = new GameObject("_Glow");
                 glowGO.transform.SetParent(_cellVis[x, y].transform);
-                glowGO.transform.localPosition = new Vector3(0, 0, -0.05f);
+                glowGO.transform.localPosition = new Vector3(0, 0, 0.05f);
                 glowGO.transform.localScale = Vector3.one * 1.15f;
                 var glowSR = glowGO.AddComponent<SpriteRenderer>();
                 glowSR.sprite = _roundedSprite;
@@ -793,10 +801,11 @@ namespace ColorDrive
                     if (i == selected)
                     {
                         sr.color = new Color(1f, 0.9f, 0.2f, 0.5f);
-                        // Bounce scale animation
-                        _queueVis[i].transform.localScale = Vector3.one;
-                        TweenHelper.ScaleTo(_queueVis[i], Vector3.one * 1.1f, 0.1f, () =>
-                            TweenHelper.ScaleTo(_queueVis[i], Vector3.one, 0.1f));
+                        // Bounce scale animation — capture GO, not loop index
+                        var qGO = _queueVis[i];
+                        qGO.transform.localScale = Vector3.one;
+                        TweenHelper.ScaleTo(qGO, Vector3.one * 1.1f, 0.1f, () =>
+                            TweenHelper.ScaleTo(qGO, Vector3.one, 0.1f));
                     }
                     else
                     {
