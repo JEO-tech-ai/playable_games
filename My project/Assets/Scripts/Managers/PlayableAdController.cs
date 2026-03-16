@@ -5,7 +5,7 @@ namespace ColorDrive
 {
     /// <summary>
     /// Playable Ad 전체 흐름 관리: Loading → Gameplay → Endcard
-    /// 
+    ///
     /// 흐름:
     ///   [LOADING]  브랜드 로고 + 로딩 바 (1.5초)
     ///              ↓
@@ -43,6 +43,9 @@ namespace ColorDrive
         private float _elapsed;
         private bool _forcedEndcard = false;
         private bool _gameEndedByPlayer = false;
+
+        // Timer bar
+        private GameObject _timerBarFill;
 
         void Awake()
         {
@@ -83,6 +86,19 @@ namespace ColorDrive
             {
                 _forcedEndcard = true;
             }
+
+            // Update gameplay timer bar
+            if (_timerBarFill != null)
+            {
+                float pct = 1f - Mathf.Clamp01(_elapsed / gameplayTimeLimit);
+                _timerBarFill.transform.localScale = new Vector3(12f * pct, 0.21f, 1f);
+                _timerBarFill.transform.position = new Vector3(-6f + (12f * pct) / 2f, -6.5f, -1.1f);
+                // Color shift: blue → yellow → red
+                Color tc = pct > 0.5f ? Color.Lerp(new Color(1f, 0.8f, 0f), new Color(0.4f, 0.8f, 1f), (pct - 0.5f) * 2f)
+                                      : Color.Lerp(Color.red, new Color(1f, 0.8f, 0f), pct * 2f);
+                var sr = _timerBarFill.GetComponent<SpriteRenderer>();
+                if (sr) sr.color = tc;
+            }
         }
 
         // ── Flow ─────────────────────────────────────────────────────────────
@@ -98,6 +114,7 @@ namespace ColorDrive
             // GAMEPLAY
             CurrentPhase = AdPhase.Gameplay;
             _loadingScreen?.SetActive(false);
+            BuildGameplayTimerBar();
             _elapsed = 0f;
 
             // Wait until player completes the game or time runs out
@@ -130,32 +147,36 @@ namespace ColorDrive
             // Brand name text
             var brandGO = new GameObject("BrandName");
             brandGO.transform.SetParent(_loadingScreen.transform);
-            brandGO.transform.position = new Vector3(0, 1.2f, -1f);
+            brandGO.transform.position = new Vector3(0, 1.8f, -1f);
             var tm = brandGO.AddComponent<TextMesh>();
             tm.text = brandName;
-            tm.fontSize = 36;
-            tm.characterSize = 0.12f;
+            tm.fontSize = 48;
+            tm.characterSize = 0.18f;
             tm.anchor = TextAnchor.MiddleCenter;
             tm.color = brandAccent;
+
+            // Thin horizontal divider between brand name and tagline
+            var divider = MakeQuad("Divider", new Vector3(0, 1.1f, -1f), new Vector2(3f, 0.02f), brandAccent, 52);
+            divider.transform.SetParent(_loadingScreen.transform);
 
             // Tagline
             var tagGO = new GameObject("Tagline");
             tagGO.transform.SetParent(_loadingScreen.transform);
-            tagGO.transform.position = new Vector3(0, 0.4f, -1f);
+            tagGO.transform.position = new Vector3(0, 0.6f, -1f);
             var tag = tagGO.AddComponent<TextMesh>();
             tag.text = tagline;
-            tag.fontSize = 20;
-            tag.characterSize = 0.07f;
+            tag.fontSize = 28;
+            tag.characterSize = 0.10f;
             tag.anchor = TextAnchor.MiddleCenter;
             tag.color = new Color(0.9f, 0.9f, 0.9f);
 
             // Loading bar background
-            var barBG = MakeQuad("BarBG", new Vector3(0, -0.8f, -1f),
-                new Vector2(4f, 0.18f), new Color(0.2f, 0.2f, 0.25f), 52);
+            var barBG = MakeQuad("BarBG", new Vector3(0, -1.2f, -1f),
+                new Vector2(4f, 0.22f), new Color(0.2f, 0.2f, 0.25f), 52);
             barBG.transform.SetParent(_loadingScreen.transform);
 
             // Loading bar fill
-            var barFill = MakeQuad("BarFill", new Vector3(-2f, -0.8f, -1.1f),
+            var barFill = MakeQuad("BarFill", new Vector3(-2f, -1.2f, -1.1f),
                 new Vector2(0.01f, 0.14f), brandAccent, 53);
             barFill.transform.SetParent(_loadingScreen.transform);
             barFill.name = "LoadingBarFill";
@@ -163,11 +184,11 @@ namespace ColorDrive
             // "Loading..." text
             var loadTxt = new GameObject("LoadingTxt");
             loadTxt.transform.SetParent(_loadingScreen.transform);
-            loadTxt.transform.position = new Vector3(0, -1.3f, -1f);
+            loadTxt.transform.position = new Vector3(0, -1.8f, -1f);
             var ltm = loadTxt.AddComponent<TextMesh>();
             ltm.text = "Loading...";
             ltm.fontSize = 16;
-            ltm.characterSize = 0.055f;
+            ltm.characterSize = 0.065f;
             ltm.anchor = TextAnchor.MiddleCenter;
             ltm.color = new Color(0.5f, 0.5f, 0.6f);
         }
@@ -184,9 +205,20 @@ namespace ColorDrive
                 float pct = Mathf.Clamp01(t / duration);
                 float w = 4f * pct;
                 fill.transform.localScale = new Vector3(w, 0.14f, 1f);
-                fill.transform.position = new Vector3(-2f + w / 2f, -0.8f, -1.1f);
+                fill.transform.position = new Vector3(-2f + w / 2f, -1.2f, -1.1f);
                 yield return null;
             }
+        }
+
+        // ── Gameplay Timer Bar ────────────────────────────────────────────────
+
+        void BuildGameplayTimerBar()
+        {
+            var barBG = MakeQuad("TimerBG", new Vector3(0, -6.5f, -1f), new Vector2(12f, 0.25f),
+                new Color(0.1f, 0.1f, 0.15f), 20);
+            var barFill = MakeQuad("TimerFill", new Vector3(0, -6.5f, -1.1f), new Vector2(12f, 0.21f),
+                new Color(0.4f, 0.8f, 1f), 21);
+            _timerBarFill = barFill;
         }
 
         // ── Endcard Screen ────────────────────────────────────────────────────
@@ -197,7 +229,7 @@ namespace ColorDrive
 
             // Overlay (semi-transparent)
             var overlay = MakeQuad("EndBG", Vector3.back * 0.5f, new Vector2(25, 18),
-                new Color(brandPrimary.r, brandPrimary.g, brandPrimary.b, 0.93f), 60);
+                new Color(brandPrimary.r, brandPrimary.g, brandPrimary.b, 0.96f), 60);
             overlay.transform.SetParent(_endcardScreen.transform);
 
             // Brand name large
@@ -207,9 +239,14 @@ namespace ColorDrive
             var btm = bGO.AddComponent<TextMesh>();
             btm.text = brandName;
             btm.fontSize = 44;
-            btm.characterSize = 0.13f;
+            btm.characterSize = 0.16f;
             btm.anchor = TextAnchor.MiddleCenter;
             btm.color = brandAccent;
+
+            // Star/score badge above score text
+            var badge = MakeQuad("ScoreBadge", new Vector3(0, 1.4f, -2.05f), new Vector2(2.8f, 0.6f),
+                new Color(brandAccent.r * 0.6f, brandAccent.g * 0.6f, brandAccent.b * 0.6f), 61);
+            badge.transform.SetParent(_endcardScreen.transform);
 
             // Score display
             var scoreGO = new GameObject("EndScore");
@@ -218,7 +255,7 @@ namespace ColorDrive
             var stm = scoreGO.AddComponent<TextMesh>();
             stm.text = "Score: 0";
             stm.fontSize = 28;
-            stm.characterSize = 0.09f;
+            stm.characterSize = 0.11f;
             stm.anchor = TextAnchor.MiddleCenter;
             stm.color = Color.white;
             scoreGO.name = "EndScoreText";
@@ -235,7 +272,7 @@ namespace ColorDrive
             ttm.color = new Color(0.85f, 0.85f, 0.85f);
 
             // CTA Button
-            var ctaBtnBG = MakeQuad("CTABtn", new Vector3(0, -0.8f, -2.1f),
+            var ctaBtnBG = MakeQuad("CTABtn", new Vector3(0, -0.6f, -2.1f),
                 new Vector2(3.5f, 0.75f), brandAccent, 62);
             ctaBtnBG.transform.SetParent(_endcardScreen.transform);
             ctaBtnBG.AddComponent<BoxCollider2D>().size = new Vector2(3.5f, 0.75f);
@@ -253,7 +290,7 @@ namespace ColorDrive
             ctm.color = brandPrimary;
 
             // Play Again
-            var replayBtn = MakeQuad("ReplayBtn", new Vector3(0, -1.9f, -2.1f),
+            var replayBtn = MakeQuad("ReplayBtn", new Vector3(0, -1.6f, -2.1f),
                 new Vector2(2.5f, 0.55f), new Color(0.25f, 0.25f, 0.35f), 62);
             replayBtn.transform.SetParent(_endcardScreen.transform);
             replayBtn.AddComponent<BoxCollider2D>().size = new Vector2(2.5f, 0.55f);
@@ -282,6 +319,7 @@ namespace ColorDrive
             ntm.color = new Color(0.4f, 0.4f, 0.5f);
 
             _endcardScreen.SetActive(false);
+            _endcardScreen.transform.localScale = Vector3.zero;
         }
 
         public void ShowEndcard(int score)
@@ -290,6 +328,7 @@ namespace ColorDrive
             _forcedEndcard = true;
             _finalScore = score;
             _endcardScreen?.SetActive(true);
+            TweenHelper.ScaleTo(_endcardScreen, Vector3.one, 0.5f);
 
             // Update score text
             var scoreGO = GameObject.Find("EndScoreText");
@@ -298,8 +337,6 @@ namespace ColorDrive
                 var tm = scoreGO.GetComponent<TextMesh>();
                 if (tm != null) tm.text = $"Score: {score}";
             }
-
-            TweenHelper.ScaleTo(_endcardScreen, Vector3.one, 0.4f);
         }
 
         public void OnCTAPressed()

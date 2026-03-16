@@ -21,12 +21,13 @@ namespace ColorDrive
 
         private Color[] COLORS = new Color[]
         {
-            new Color(0.2f, 0.45f, 1f),    // Blue
-            new Color(1f, 0.25f, 0.25f),   // Red
-            new Color(0.2f, 0.85f, 0.3f),  // Green
-            new Color(1f, 0.85f, 0f),      // Yellow
-            new Color(1f, 0.5f, 0f),       // Orange
-            new Color(0.75f, 0.2f, 1f),    // Purple
+            new Color(0.18f, 0.52f, 1.00f),   // Vivid Blue
+            new Color(1.00f, 0.28f, 0.30f),   // Vivid Red
+            new Color(0.15f, 0.90f, 0.40f),   // Vivid Green
+            new Color(1.00f, 0.88f, 0.10f),   // Vivid Yellow
+            new Color(1.00f, 0.52f, 0.08f),   // Vivid Orange
+            new Color(0.80f, 0.25f, 1.00f),   // Vivid Purple
+            new Color(0.10f, 0.95f, 0.95f),   // Cyan
         };
 
         // ── Game State ────────────────────────────────────────────────────────
@@ -51,7 +52,13 @@ namespace ColorDrive
         // ── Visuals ───────────────────────────────────────────────────────────
         private GameObject[] _queueVis = new GameObject[3];
         private TextMesh _scoreText, _movesText, _statusText;
-        private Sprite _whiteSprite;
+        private Sprite _roundedSprite;
+
+        // ── Slot pulse state ──────────────────────────────────────────────────
+        private List<SpriteRenderer> _slotRenderers = new List<SpriteRenderer>();
+        private Coroutine _slotPulseCoroutine;
+        private readonly Color _slotDefaultColor = new Color(0.3f, 0.9f, 0.3f, 0.35f);
+        private readonly Color _slotActiveColor  = new Color(0.2f, 1.0f, 0.2f, 0.85f);
 
         // ── Piece Shapes ──────────────────────────────────────────────────────
         private List<List<Vector2Int>> SHAPES = new List<List<Vector2Int>>
@@ -70,7 +77,7 @@ namespace ColorDrive
 
         void Start()
         {
-            _whiteSprite = MakeWhiteSprite();
+            _roundedSprite = MakeRoundedSprite();
             SetupCamera();
             SetupBackground();
             InitGrid();
@@ -81,7 +88,12 @@ namespace ColorDrive
             RefillQueue();
             UpdateQueueVisuals();
             SetGameActive(true);
-            ShowStatus("Click a piece, then click a slot arrow!");
+
+            // Auto-select piece 0 so player knows what to do
+            _selectedPiece = 0;
+            HighlightQueueSlot(0);
+            ShowStatus("Place the highlighted piece \u2192 click any green arrow");
+            StartSlotPulse();
         }
 
         void Update()
@@ -105,7 +117,7 @@ namespace ColorDrive
             var cam = Camera.main;
             if (cam == null) return;
             cam.orthographic = true;
-            cam.orthographicSize = 6.5f;
+            cam.orthographicSize = 5.8f;
             cam.transform.position = new Vector3(0, 0, -10);
             cam.backgroundColor = new Color(0.07f, 0.07f, 0.12f);
         }
@@ -163,36 +175,43 @@ namespace ColorDrive
             for (int y = 0; y < gridRows; y++)
             {
                 float py = oy + y * cellSize;
-                MakeSlot($"SL{y}", new Vector3(-hw - off, py, -0.2f), "→",
-                    new Color(0.3f, 0.9f, 0.3f, 0.4f), Dir.Left, y);
+                var slotGO = MakeSlot($"SL{y}", new Vector3(-hw - off, py, -0.2f), "\u2192",
+                    _slotDefaultColor, Dir.Left, y);
+                var sr = slotGO.GetComponent<SpriteRenderer>();
+                if (sr != null) _slotRenderers.Add(sr);
             }
             // Right (←)
             for (int y = 0; y < gridRows; y++)
             {
                 float py = oy + y * cellSize;
-                MakeSlot($"SR{y}", new Vector3(hw + off, py, -0.2f), "←",
-                    new Color(0.3f, 0.9f, 0.3f, 0.4f), Dir.Right, y);
+                var slotGO = MakeSlot($"SR{y}", new Vector3(hw + off, py, -0.2f), "\u2190",
+                    _slotDefaultColor, Dir.Right, y);
+                var sr = slotGO.GetComponent<SpriteRenderer>();
+                if (sr != null) _slotRenderers.Add(sr);
             }
             // Bottom (↑)
             for (int x = 0; x < gridCols; x++)
             {
                 float px = ox + x * cellSize;
-                MakeSlot($"SB{x}", new Vector3(px, -hh - off, -0.2f), "↑",
-                    new Color(0.9f, 0.6f, 0.3f, 0.4f), Dir.Down, x);
+                var slotGO = MakeSlot($"SB{x}", new Vector3(px, -hh - off, -0.2f), "\u2191",
+                    new Color(0.9f, 0.6f, 0.3f, 0.35f), Dir.Down, x);
+                // Bottom/Top slots use orange palette — don't add to pulse list
+                _ = slotGO;
             }
             // Top (↓)
             for (int x = 0; x < gridCols; x++)
             {
                 float px = ox + x * cellSize;
-                MakeSlot($"ST{x}", new Vector3(px, hh + off, -0.2f), "↓",
-                    new Color(0.9f, 0.6f, 0.3f, 0.4f), Dir.Up, x);
+                var slotGO = MakeSlot($"ST{x}", new Vector3(px, hh + off, -0.2f), "\u2193",
+                    new Color(0.9f, 0.6f, 0.3f, 0.35f), Dir.Up, x);
+                _ = slotGO;
             }
         }
 
-        void MakeSlot(string name, Vector3 pos, string arrow, Color color, Dir dir, int idx)
+        GameObject MakeSlot(string name, Vector3 pos, string arrow, Color color, Dir dir, int idx)
         {
-            var go = MakeQuad(name, pos, Vector2.one * (cellSize * 0.7f), color, 1);
-            go.AddComponent<BoxCollider2D>().size = Vector2.one * (cellSize * 0.7f);
+            var go = MakeQuad(name, pos, Vector2.one * (cellSize * 0.85f), color, 1);
+            go.AddComponent<BoxCollider2D>().size = Vector2.one * (cellSize * 0.85f);
 
             var tm = new GameObject("Lbl");
             tm.transform.SetParent(go.transform);
@@ -206,6 +225,8 @@ namespace ColorDrive
 
             var trigger = go.AddComponent<SlotTrigger>();
             trigger.Init(dir, idx, this);
+
+            return go;
         }
 
         void BuildQueueArea()
@@ -252,12 +273,12 @@ namespace ColorDrive
 
             // Score
             var scoreGO = MakeTextMesh("Score", new Vector3(-hw - 0.2f, hh + 1.6f, 0),
-                "SCORE\n0", 0.06f, Color.white);
+                "SCORE\n0", 0.075f, Color.white);
             _scoreText = scoreGO.GetComponent<TextMesh>();
 
             // Moves
             var movesGO = MakeTextMesh("Moves", new Vector3(hw + 0.2f, hh + 1.6f, 0),
-                $"MOVES\n{movesAllowed}", 0.06f, new Color(1f, 0.6f, 0.2f));
+                $"MOVES\n{movesAllowed}", 0.075f, new Color(1f, 0.6f, 0.2f));
             _movesText = movesGO.GetComponent<TextMesh>();
 
             // Status/instruction
@@ -291,7 +312,7 @@ namespace ColorDrive
             if (!_gameActive) return;
             _selectedPiece = idx;
             HighlightQueueSlot(idx);
-            ShowStatus($"Place piece {idx + 1} → click a slot arrow");
+            ShowStatus($"Place piece {idx + 1} \u2192 click a slot arrow");
         }
 
         public void OnSlotClicked(Dir dir, int slotIdx)
@@ -315,6 +336,17 @@ namespace ColorDrive
                 UpdateCellVisual(c.x, c.y, COLORS[piece.colorIdx]);
             }
 
+            // Stop pulse while placing
+            StopSlotPulse();
+
+            // Punch scale on placed cells
+            foreach (var c in worldCells)
+            {
+                var cellGO = _cellVis[c.x, c.y];
+                TweenHelper.ScaleTo(cellGO, Vector3.one * 1.25f, 0.08f, () =>
+                    TweenHelper.ScaleTo(cellGO, Vector3.one, 0.12f));
+            }
+
             _movesLeft--;
             UpdateHUD();
 
@@ -322,14 +354,17 @@ namespace ColorDrive
             int clearedCount = CheckAndClear();
             if (clearedCount > 0)
             {
-                _score += clearedCount * 10 * (1 + clearedCount / 5);
+                int pts = clearedCount * 10 * (1 + clearedCount / 5);
+                _score += pts;
                 UpdateHUD();
-                ShowStatus($"NICE! Cleared {clearedCount} blocks! +{clearedCount * 10}pts");
+                ShowStatus($"NICE! Cleared {clearedCount} blocks! +{pts}pts");
+                ShowFloatingText($"+{pts}", new Vector3(0, 0, 0), new Color(1f, 0.9f, 0.2f));
             }
 
             // Check win (board clear)
             if (IsBoardClear())
             {
+                StopSlotPulse();
                 SetGameActive(false);
                 ShowStatus("BOARD CLEARED! Score: " + _score + "  [R] to play again");
                 OnGameEnded?.Invoke(_score);
@@ -348,13 +383,18 @@ namespace ColorDrive
             // Check moves
             if (_movesLeft <= 0)
             {
+                StopSlotPulse();
                 SetGameActive(false);
                 ShowStatus("Out of moves! Score: " + _score + "  [R] to restart");
                 OnGameEnded?.Invoke(_score);
                 return;
             }
 
-            ShowStatus("Click a piece, then click a slot arrow");
+            // Auto-select next piece
+            _selectedPiece = 0;
+            HighlightQueueSlot(0);
+            ShowStatus("Keep placing! Click a green arrow.");
+            StartSlotPulse();
         }
 
         private List<Vector2Int> GetWorldCells(List<Vector2Int> shape, Dir dir, int slotIdx)
@@ -488,6 +528,63 @@ namespace ColorDrive
             return true;
         }
 
+        // ── Slot Pulse ────────────────────────────────────────────────────────
+
+        void StartSlotPulse()
+        {
+            StopSlotPulse();
+            _slotPulseCoroutine = StartCoroutine(SlotPulseCoroutine());
+        }
+
+        void StopSlotPulse()
+        {
+            if (_slotPulseCoroutine != null) { StopCoroutine(_slotPulseCoroutine); _slotPulseCoroutine = null; }
+            foreach (var sr in _slotRenderers) if (sr != null) sr.color = _slotDefaultColor;
+        }
+
+        IEnumerator SlotPulseCoroutine()
+        {
+            while (true)
+            {
+                float t = Mathf.PingPong(Time.unscaledTime * 2.5f, 1f);
+                float ease = t * t * (3f - 2f * t); // smoothstep
+                Color c = Color.Lerp(_slotDefaultColor, _slotActiveColor, ease);
+                foreach (var sr in _slotRenderers) if (sr != null) sr.color = c;
+                yield return null;
+            }
+        }
+
+        // ── Floating Score Text ───────────────────────────────────────────────
+
+        void ShowFloatingText(string text, Vector3 pos, Color color)
+        {
+            StartCoroutine(FloatTextCoroutine(text, pos, color));
+        }
+
+        IEnumerator FloatTextCoroutine(string text, Vector3 pos, Color color)
+        {
+            var go = new GameObject("_FloatText");
+            go.transform.position = pos + Vector3.back * 2f;
+            var tm = go.AddComponent<TextMesh>();
+            tm.text = text;
+            tm.fontSize = 32;
+            tm.characterSize = 0.10f;
+            tm.anchor = TextAnchor.MiddleCenter;
+            var mr = go.GetComponent<MeshRenderer>();
+            if (mr != null) mr.sortingOrder = 80;
+
+            float dur = 1.4f, elapsed = 0f;
+            while (elapsed < dur)
+            {
+                elapsed += Time.deltaTime;
+                float pct = elapsed / dur;
+                go.transform.position = pos + Vector3.up * (pct * 2.0f) + Vector3.back * 2f;
+                tm.color = new Color(color.r, color.g, color.b, Mathf.Clamp01(1.5f - pct * 1.5f));
+                yield return null;
+            }
+            Destroy(go);
+        }
+
         // ── Visuals ───────────────────────────────────────────────────────────
 
         void UpdateCellVisual(int x, int y, Color color)
@@ -594,7 +691,12 @@ namespace ColorDrive
             UpdateQueueVisuals();
             UpdateHUD();
             SetGameActive(true);
-            ShowStatus("Game restarted! Click a piece, then a slot arrow.");
+
+            // Auto-select piece 0 on restart
+            _selectedPiece = 0;
+            HighlightQueueSlot(0);
+            ShowStatus("Game restarted! Place the highlighted piece.");
+            StartSlotPulse();
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -608,7 +710,7 @@ namespace ColorDrive
             go.transform.position = pos;
             go.transform.localScale = new Vector3(size.x, size.y, 1f);
             var sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = _whiteSprite ?? (_whiteSprite = MakeWhiteSprite());
+            sr.sprite = _roundedSprite ?? (_roundedSprite = MakeRoundedSprite());
             sr.color = color;
             sr.sortingOrder = sortOrder;
             return go;
@@ -627,14 +729,24 @@ namespace ColorDrive
             return go;
         }
 
-        Sprite MakeWhiteSprite()
+        Sprite MakeRoundedSprite(int size = 64, float cornerPct = 0.25f)
         {
-            var tex = new Texture2D(4, 4);
-            var px = new Color[16];
-            for (int i = 0; i < px.Length; i++) px[i] = Color.white;
-            tex.SetPixels(px);
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float r = cornerPct * size * 0.5f;
+            float cx = size * 0.5f - 0.5f, cy = size * 0.5f - 0.5f;
+            float inner = size * 0.5f - r;
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float dx = Mathf.Max(0f, Mathf.Abs(x - cx) - inner);
+                float dy = Mathf.Max(0f, Mathf.Abs(y - cy) - inner);
+                float d = Mathf.Sqrt(dx * dx + dy * dy);
+                float alpha = Mathf.Clamp01(r - d);
+                tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
             tex.Apply();
-            return Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f);
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
         }
     }
 
