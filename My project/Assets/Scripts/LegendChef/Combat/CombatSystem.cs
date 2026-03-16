@@ -31,6 +31,10 @@ namespace LegendChef.Combat
             bool isCrit = Random.value < critChance;
             float finalDmg = isCrit ? baseDmg * critMult : baseDmg;
 
+            // 콤보 배율 적용
+            if (ComboSystem.Instance != null)
+                finalDmg *= ComboSystem.Instance.ComboMultiplier;
+
             return (finalDmg, isCrit);
         }
     }

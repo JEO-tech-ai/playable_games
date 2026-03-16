@@ -173,6 +173,14 @@ namespace LegendChef
             // FloatingTextManager
             GameObject ftGO = new GameObject("FloatingTextManager");
             ftGO.AddComponent<FloatingTextManager>();
+
+            // ComboSystem
+            GameObject comboGO = new GameObject("ComboSystem");
+            comboGO.AddComponent<ComboSystem>();
+
+            // TensionManager
+            GameObject tensionGO = new GameObject("TensionManager");
+            tensionGO.AddComponent<TensionManager>();
         }
 
         // ── 플레이어 생성 ──
@@ -197,6 +205,11 @@ namespace LegendChef
             GameObject diffHintGO = new GameObject("DifficultyHintUI");
             DifficultyHintUI diffHint = diffHintGO.AddComponent<DifficultyHintUI>();
             diffHint.Initialize();
+
+            // 콤보 디스플레이 UI
+            GameObject comboDisplayGO = new GameObject("ComboDisplayUI");
+            ComboDisplayUI comboDisplay = comboDisplayGO.AddComponent<ComboDisplayUI>();
+            comboDisplay.Initialize();
         }
 
         // ── 메뉴 화면 ──
@@ -255,6 +268,10 @@ namespace LegendChef
 
         private void OnBossTimeout()
         {
+            // 텐션 매니저 알림
+            if (TensionManager.Instance != null)
+                TensionManager.Instance.OnBossTimeout();
+
             // 현재 적 제거
             if (_currentEnemy != null)
             {
@@ -294,10 +311,12 @@ namespace LegendChef
             if (PlayerController.Instance != null)
                 PlayerController.Instance.CurrentEnemy = _currentEnemy;
 
-            // 보스면 타이머 시작
+            // 보스면 타이머 시작 + 텐션 매니저 알림
             if (isBoss)
             {
                 StartBossTimer();
+                if (TensionManager.Instance != null)
+                    TensionManager.Instance.OnBossSpawned(_currentEnemy);
             }
             else
             {
@@ -311,9 +330,14 @@ namespace LegendChef
             if (_currentEnemy == null) return;
 
             bool wasBoss = _currentEnemy.IsBoss;
+            Vector3 deathPos = _currentEnemy.transform.position;
 
             // 보스 타이머 중지
             StopBossTimer();
+
+            // 보스 사망 이펙트
+            if (wasBoss && TensionManager.Instance != null)
+                TensionManager.Instance.OnBossDefeated(deathPos);
 
             // 보상 지급
             if (CurrencySystem.Instance != null)
@@ -390,6 +414,10 @@ namespace LegendChef
 
                 if (LegendChefHUD.Instance != null)
                     LegendChefHUD.Instance.UpdateBossTimer(remaining, total);
+
+                // 텐션 매니저 업데이트
+                if (TensionManager.Instance != null)
+                    TensionManager.Instance.UpdateBossTimer(remaining, total);
 
                 yield return null;
             }

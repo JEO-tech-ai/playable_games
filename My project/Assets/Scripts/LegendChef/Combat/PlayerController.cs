@@ -18,6 +18,9 @@ namespace LegendChef.Combat
         [SerializeField] private float _autoAttackTimer;
 
         private SpriteRenderer _spriteRenderer;
+        private SpriteAnimator _spriteAnimator;
+        private AnimationClipData _idleClip;
+        private AnimationClipData _attackClip;
 
         /// <summary>
         /// 현재 타겟 적
@@ -35,6 +38,12 @@ namespace LegendChef.Combat
             _spriteRenderer.sprite = PixelArtGenerator.CreatePlayerSprite();
             _spriteRenderer.sortingOrder = 10;
             transform.localScale = new Vector3(1.5f, 1.5f, 1f);
+
+            // 애니메이션 설정
+            _spriteAnimator = gameObject.AddComponent<SpriteAnimator>();
+            _idleClip = AnimationFrameBuilder.GetChefIdle();
+            _attackClip = AnimationFrameBuilder.GetChefAttack();
+            _spriteAnimator.Play(_idleClip);
         }
 
         private void Update()
@@ -65,6 +74,10 @@ namespace LegendChef.Combat
             if (LegendChefGameManager.Instance.CurrentState != GameState.Playing) return;
             if (CurrentEnemy == null) return;
 
+            // 콤보 등록
+            if (ComboSystem.Instance != null)
+                ComboSystem.Instance.RegisterTap();
+
             AttackEnemy();
         }
 
@@ -76,10 +89,29 @@ namespace LegendChef.Combat
             var (damage, isCrit) = CombatSystem.Instance.CalculateDamage();
             var (actualDmg, _) = CurrentEnemy.TakeDamage(damage, isCrit);
 
-            if (actualDmg > 0f && FloatingTextManager.Instance != null)
+            if (actualDmg > 0f)
             {
-                Vector3 textPos = CurrentEnemy.transform.position + new Vector3(0f, 0.5f, 0f);
-                FloatingTextManager.Instance.SpawnFloatingText(textPos, actualDmg, isCrit);
+                // 플로팅 텍스트
+                if (FloatingTextManager.Instance != null)
+                {
+                    Vector3 textPos = CurrentEnemy.transform.position + new Vector3(0f, 0.5f, 0f);
+                    FloatingTextManager.Instance.SpawnFloatingText(textPos, actualDmg, isCrit);
+                }
+
+                // 슬래시 이펙트
+                SlashEffect.Spawn(CurrentEnemy.transform.position, isCrit);
+
+                // 크리티컬 버스트 이펙트
+                if (isCrit)
+                {
+                    CritBurstEffect.Spawn(CurrentEnemy.transform.position);
+                }
+
+                // 공격 애니메이션 재생 후 IDLE로 복귀
+                if (_spriteAnimator != null)
+                {
+                    PlayAttackAnimation();
+                }
             }
 
             // 화면 흔들림 (크리티컬만)
@@ -87,6 +119,20 @@ namespace LegendChef.Combat
             {
                 ScreenShakeEffect.Instance.Shake(0.15f, 0.08f);
             }
+        }
+
+        private void PlayAttackAnimation()
+        {
+            _spriteAnimator.OnAnimationComplete -= OnAttackAnimationComplete;
+            _spriteAnimator.OnAnimationComplete += OnAttackAnimationComplete;
+            _spriteAnimator.Play(_attackClip);
+        }
+
+        private void OnAttackAnimationComplete()
+        {
+            _spriteAnimator.OnAnimationComplete -= OnAttackAnimationComplete;
+            if (_idleClip != null)
+                _spriteAnimator.Play(_idleClip);
         }
     }
 }

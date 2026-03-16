@@ -25,6 +25,10 @@ namespace LegendChef.Combat
         private SpriteRenderer _spriteRenderer;
         private Color _originalColor;
         private bool _isDead;
+        private SpriteAnimator _spriteAnimator;
+        private AnimationClipData _walkClip;
+        private AnimationClipData _hitClip;
+        private AnimationClipData _idleClip;
 
         public float MaxHP => _maxHP;
         public float CurrentHP => _currentHP;
@@ -64,6 +68,20 @@ namespace LegendChef.Combat
             }
 
             _originalColor = _spriteRenderer.color;
+
+            // 애니메이션 설정
+            _spriteAnimator = gameObject.AddComponent<SpriteAnimator>();
+            if (isBoss)
+            {
+                _idleClip = AnimationFrameBuilder.GetBossIdle();
+                _hitClip = AnimationFrameBuilder.GetEnemyHit();
+            }
+            else
+            {
+                _walkClip = AnimationFrameBuilder.GetEnemyWalk();
+                _hitClip = AnimationFrameBuilder.GetEnemyHit();
+                _spriteAnimator.Play(_walkClip);
+            }
         }
 
         private void Update()
@@ -81,6 +99,16 @@ namespace LegendChef.Combat
                 if (Mathf.Abs(pos.x - _targetX) < 0.01f)
                 {
                     _isArrived = true;
+                    // 도착 시 걷기 애니메이션 정지
+                    if (_spriteAnimator != null && !_isBoss)
+                    {
+                        _spriteAnimator.Stop();
+                        // 원본 스프라이트 복원
+                        if (_spriteRenderer != null)
+                            _spriteRenderer.sprite = _isBoss
+                                ? PixelArtGenerator.CreateEnemyBossSprite()
+                                : PixelArtGenerator.CreateEnemyBasicSprite();
+                    }
                 }
             }
         }
@@ -99,6 +127,14 @@ namespace LegendChef.Combat
 
             OnDamaged?.Invoke(actual, isCrit);
 
+            // 피격 애니메이션
+            if (_spriteAnimator != null && _hitClip != null)
+            {
+                _spriteAnimator.OnAnimationComplete -= OnHitAnimationComplete;
+                _spriteAnimator.OnAnimationComplete += OnHitAnimationComplete;
+                _spriteAnimator.Play(_hitClip);
+            }
+
             // 피격 이펙트
             StartCoroutine(HitFlashCoroutine());
 
@@ -109,6 +145,20 @@ namespace LegendChef.Combat
             }
 
             return (actual, isCrit);
+        }
+
+        private void OnHitAnimationComplete()
+        {
+            if (_spriteAnimator != null)
+                _spriteAnimator.OnAnimationComplete -= OnHitAnimationComplete;
+
+            // 히트 후 원본 스프라이트 복원
+            if (_spriteRenderer != null && !_isDead)
+            {
+                _spriteRenderer.sprite = _isBoss
+                    ? PixelArtGenerator.CreateEnemyBossSprite()
+                    : PixelArtGenerator.CreateEnemyBasicSprite();
+            }
         }
 
         private IEnumerator HitFlashCoroutine()
