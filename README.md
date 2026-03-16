@@ -1,13 +1,23 @@
 # 전설의 불꽃 셰프 🔥👨‍🍳
 
-> **브랜치**: `dev_legend` — 방치형 클리커 플레이어블 게임
+> 방치형 클리커 플레이어블 게임 — Unity 6 · Procedural Pixel Art · Mobile-First
 
 [![Unity](https://img.shields.io/badge/Unity-6000.3.10f1-black?logo=unity&logoColor=white)](https://unity.com/)
 [![Platform](https://img.shields.io/badge/Platform-Mobile%20Web%20%7C%20iOS%20%7C%20Android-blue?logo=google-chrome)](https://unity.com/)
 [![Genre](https://img.shields.io/badge/Genre-Idle%20Clicker-orange)](https://github.com)
-[![Branch](https://img.shields.io/badge/Branch-dev__legend-brightgreen)](https://github.com)
-[![Scripts](https://img.shields.io/badge/Scripts-15%20C%23-blueviolet)](https://github.com)
+[![Scripts](https://img.shields.io/badge/Scripts-25%20C%23-blueviolet)](https://github.com)
+[![Branch](https://img.shields.io/badge/Branch-main-brightgreen)](https://github.com/JEO-tech-ai/playable_games/tree/main)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-success?logo=github)](https://github.com/JEO-tech-ai/playable_games/releases)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](https://github.com)
+
+---
+
+## 스크린샷
+
+| 타이틀 화면 | 일반 전투 (Stage 7) | 보스전 (Stage 10) |
+|:-----------:|:-------------------:|:-----------------:|
+| ![메뉴](My%20project/Assets/Screenshots/legend_chef_menu.png) | ![게임플레이](My%20project/Assets/Screenshots/legend_chef_gameplay.png) | ![보스전](My%20project/Assets/Screenshots/legend_chef_boss.png) |
+| 시작 화면, 요리사 캐릭터 | 슬래시 이펙트 · 콤보 · 업그레이드 UI | 보스 타이머 · 치명타 · FEVER 콤보 |
 
 ---
 
