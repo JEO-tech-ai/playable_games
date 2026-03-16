@@ -152,6 +152,40 @@ namespace ColorDrive
         {
             MakeQuad("Background", Vector3.forward * 2f, new Vector2(25f, 18f),
                 new Color(0.10f, 0.04f, 0.18f), -10);
+            BuildStarfield();
+        }
+
+        void BuildStarfield()
+        {
+            for (int i = 0; i < 80; i++)
+            {
+                float sz = Random.Range(0.04f, 0.10f);
+                float rx = Random.Range(-12f, 12f);
+                float ry = Random.Range(-7f, 7f);
+                float rz = Random.Range(1f, 3f);
+                Color sc = Color.Lerp(Color.white, new Color(0.7f, 0.85f, 1f), Random.Range(0f, 1f));
+                sc.a = Random.Range(0.3f, 0.8f);
+                var star = MakeQuad($"Star{i}", new Vector3(rx, ry, rz), Vector2.one * sz, sc, -9);
+                StartCoroutine(StarTwinkleCoroutine(star, sc));
+            }
+        }
+
+        IEnumerator StarTwinkleCoroutine(GameObject star, Color baseColor)
+        {
+            float phase = Random.Range(0f, Mathf.PI * 2f);
+            float speed = Random.Range(0.5f, 2.0f);
+            while (star != null)
+            {
+                float t = (Mathf.Sin(Time.unscaledTime * speed + phase) + 1f) * 0.5f;
+                var sr = star.GetComponent<SpriteRenderer>();
+                if (sr != null)
+                {
+                    Color c = baseColor;
+                    c.a = Mathf.Lerp(baseColor.a * 0.3f, baseColor.a, t);
+                    sr.color = c;
+                }
+                yield return null;
+            }
         }
 
         void InitGrid()
@@ -178,6 +212,23 @@ namespace ColorDrive
             // Grid panel inner shadow (slightly darker, slightly smaller)
             MakeQuad("GridPanelInner", new Vector3(0, 0, 0.4f), new Vector2(gw + 0.1f, gh + 0.1f),
                 new Color(0.118f, 0.086f, 0.251f), -1);
+
+            // Grid interior decoration lines (vertical)
+            for (int x = 1; x < gridCols; x++)
+            {
+                float lx = GridOriginX() + x * cellSize - cellSize / 2f;
+                MakeQuad($"VLine{x}", new Vector3(lx, 0, 0.15f),
+                    new Vector2(0.02f, gridRows * cellSize),
+                    new Color(0.3f, 0.2f, 0.5f, 0.25f), -1);
+            }
+            // Grid interior decoration lines (horizontal)
+            for (int y = 1; y < gridRows; y++)
+            {
+                float ly = GridOriginY() + y * cellSize - cellSize / 2f;
+                MakeQuad($"HLine{y}", new Vector3(0, ly, 0.15f),
+                    new Vector2(gridCols * cellSize, 0.02f),
+                    new Color(0.3f, 0.2f, 0.5f, 0.25f), -1);
+            }
 
             for (int x = 0; x < gridCols; x++)
                 for (int y = 0; y < gridRows; y++)
@@ -241,6 +292,12 @@ namespace ColorDrive
         {
             var go = MakeQuad(name, pos, Vector2.one * (cellSize * 0.85f), color, 1);
             go.AddComponent<BoxCollider2D>().size = Vector2.one * (cellSize * 0.85f);
+
+            // Glow ring behind slot
+            var glowRing = MakeQuad(name + "_Glow", pos + Vector3.forward * 0.1f,
+                Vector2.one * (cellSize * 0.85f * 1.3f),
+                new Color(color.r, color.g, color.b, 0.12f), 0);
+            glowRing.transform.SetParent(go.transform);
 
             var tm = new GameObject("Lbl");
             tm.transform.SetParent(go.transform);
@@ -545,11 +602,48 @@ namespace ColorDrive
             var sr = _cellVis[x, y].GetComponent<SpriteRenderer>();
             if (sr == null) yield break;
 
+            // Spawn 6 sparkle particles
+            Vector3 origin = _cellVis[x, y].transform.position;
+            for (int p = 0; p < 6; p++)
+            {
+                float angle = p * 60f * Mathf.Deg2Rad;
+                var spark = new GameObject("_Spark");
+                spark.transform.position = origin;
+                var sparkSR = spark.AddComponent<SpriteRenderer>();
+                sparkSR.sprite = _roundedSprite;
+                sparkSR.sortingOrder = 50;
+                Color sc = sr.color; sc.a = 1f;
+                sparkSR.color = sc;
+                spark.transform.localScale = Vector3.one * 0.15f;
+                StartCoroutine(SparkCoroutine(spark, angle));
+            }
+
             // Flash white then back to dark
-            Color clearColor = sr.color;
             sr.color = Color.white;
-            yield return new WaitForSeconds(0.1f);
-            sr.color = new Color(0.118f, 0.086f, 0.251f);  // empty color (deep purple)
+            yield return new WaitForSeconds(0.08f);
+            sr.color = new Color(0.118f, 0.086f, 0.251f);
+            // Remove glow
+            var oldGlow = _cellVis[x, y].transform.Find("_Glow");
+            if (oldGlow != null) Destroy(oldGlow.gameObject);
+        }
+
+        private IEnumerator SparkCoroutine(GameObject spark, float angle)
+        {
+            if (spark == null) yield break;
+            float dur = 0.45f, elapsed = 0f;
+            Vector3 origin = spark.transform.position;
+            Vector3 dir = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f);
+            var sr = spark.GetComponent<SpriteRenderer>();
+            while (elapsed < dur && spark != null)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / dur;
+                spark.transform.position = origin + dir * t * 0.6f;
+                spark.transform.localScale = Vector3.one * Mathf.Lerp(0.15f, 0.04f, t);
+                if (sr != null) { Color c = sr.color; c.a = Mathf.Clamp01(1f - t); sr.color = c; }
+                yield return null;
+            }
+            if (spark != null) Destroy(spark);
         }
 
         private bool IsBoardClear()
@@ -624,12 +718,27 @@ namespace ColorDrive
             if (_cellVis[x, y] == null) return;
             var sr = _cellVis[x, y].GetComponent<SpriteRenderer>();
             if (sr == null) return;
-            // Find color index
+
+            // Remove old glow
+            var oldGlow = _cellVis[x, y].transform.Find("_Glow");
+            if (oldGlow != null) Destroy(oldGlow.gameObject);
+
             int colorIdx = _grid[x, y];
             if (colorIdx >= 0 && _pieceSprites != null && colorIdx < _pieceSprites.Length)
             {
                 sr.sprite = _pieceSprites[colorIdx];
                 sr.color = Color.white;
+
+                // Add glow overlay
+                var glowGO = new GameObject("_Glow");
+                glowGO.transform.SetParent(_cellVis[x, y].transform);
+                glowGO.transform.localPosition = new Vector3(0, 0, -0.05f);
+                glowGO.transform.localScale = Vector3.one * 1.15f;
+                var glowSR = glowGO.AddComponent<SpriteRenderer>();
+                glowSR.sprite = _roundedSprite;
+                Color gc = COLORS[colorIdx]; gc.a = 0.4f;
+                glowSR.color = gc;
+                glowSR.sortingOrder = sr.sortingOrder - 1;
             }
             else
             {
@@ -680,9 +789,20 @@ namespace ColorDrive
                 if (_queueVis[i] == null) continue;
                 var sr = _queueVis[i].GetComponent<SpriteRenderer>();
                 if (sr != null)
-                    sr.color = i == selected
-                        ? new Color(1f, 0.9f, 0.2f, 0.5f)
-                        : new Color(0.165f, 0.122f, 0.306f, 0.9f);
+                {
+                    if (i == selected)
+                    {
+                        sr.color = new Color(1f, 0.9f, 0.2f, 0.5f);
+                        // Bounce scale animation
+                        _queueVis[i].transform.localScale = Vector3.one;
+                        TweenHelper.ScaleTo(_queueVis[i], Vector3.one * 1.1f, 0.1f, () =>
+                            TweenHelper.ScaleTo(_queueVis[i], Vector3.one, 0.1f));
+                    }
+                    else
+                    {
+                        sr.color = new Color(0.165f, 0.122f, 0.306f, 0.9f);
+                    }
+                }
             }
         }
 
