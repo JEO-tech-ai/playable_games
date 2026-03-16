@@ -336,12 +336,15 @@ namespace ColorDrive
             _selectedPiece = -1;
         }
 
+        public int SelectedPieceIdx => _selectedPiece;
+
         public void OnQueueSlotClicked(int idx)
         {
             if (!_gameActive) return;
             _selectedPiece = idx;
             HighlightQueueSlot(idx);
             ShowStatus($"Place piece {idx + 1} \u2192 click a slot arrow");
+            StartSlotPulse();
         }
 
         public void OnSlotClicked(Dir dir, int slotIdx)
@@ -878,7 +881,7 @@ namespace ColorDrive
         void OnMouseExit()
         {
             var sr = GetComponent<SpriteRenderer>();
-            if (sr != null) sr.color = new Color(0.3f, 0.9f, 0.3f, 0.4f);
+            if (sr != null) sr.color = new Color(0.3f, 0.9f, 0.3f, 0.35f);
         }
     }
 
@@ -900,7 +903,10 @@ namespace ColorDrive
         void OnMouseExit()
         {
             var sr = GetComponent<SpriteRenderer>();
-            if (sr != null) sr.color = new Color(0.165f, 0.122f, 0.306f, 0.9f);
+            if (sr != null)
+                sr.color = (_game != null && _game.SelectedPieceIdx == _idx)
+                    ? new Color(1f, 0.9f, 0.2f, 0.5f)   // keep gold if still selected
+                    : new Color(0.165f, 0.122f, 0.306f, 0.9f);
         }
     }
 }
